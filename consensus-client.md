@@ -38,8 +38,8 @@ pub trait ConsensusClient {
     /// Return the unbonding period (i.e the time it takes for a validator's deposit to be unstaked from the network)
     fn unbonding_period(&self) -> Duration;
 
-	/// Return an implementation of a [`StateMachineClient`] for the given state mahcine identifier. Return an error if the identifier is unknown.
-	fn state_machine(&self, state_machine_id: StateMachineId) -> Result<Box<dyn StateMachineClient>, Error>;
+    /// Return an implementation of a [`StateMachineClient`] for the given state mahcine identifier. Return an error if the identifier is unknown.
+    fn state_machine(&self, state_machine_id: StateMachineId) -> Result<Box<dyn StateMachineClient>, Error>;
 }
 ```
 
@@ -62,7 +62,7 @@ The `StateMachineClient` is defined as follows:
 ```rust
 /// A state machine client. An abstraction for the mechanism of state proof verification for state machines.
 trait StateMachineClient {
-	/// Verify the membership proof of a batch of requests/responses.
+    /// Verify the membership proof of a batch of requests/responses.
     fn verify_membership(
         &self,
         host: &dyn IsmpHost,
