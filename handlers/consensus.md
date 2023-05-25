@@ -63,7 +63,7 @@ pub struct ConsensusMessage {
 }
 ```
 
-The handler uses the `IsmpHost` to fetch the proper `ConsensusClient` implementation, invoking it's `verify_consensus_proof` method with the provided proof, and a trusted consensus state. If consensus proof verification is successful, the handler should persist the latest state commitments for each state machine returned.
+The handler uses the `IsmpHost` to fetch the appropriate [`ConsensusClient`](../consensus-client.md) implementation, invoking it's `verify_consensus_proof` method with the provided proof, and a trusted consensus state. If consensus proof verification is successful, the handler should persist the latest state commitments for each state machine returned.
 
 
 ## `FraudProofMessage`
@@ -79,4 +79,5 @@ pub struct FraudProofMessage {
 }
 ```
 
+The handler uses the `IsmpHost` to fetch the appropriate [`ConsensusClient`](../consensus-client.md) implementation, invoking it's `verify_fraud_proof` method with the provided proofs, and a trusted consensus state. If fraud proof verification is successful, the handler marks a consensus client as frozen, requiring an admin or network quorum to unfreeze the client.
  
