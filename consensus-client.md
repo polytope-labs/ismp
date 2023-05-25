@@ -23,7 +23,7 @@ pub trait ConsensusClient {
         host: &dyn IsmpHost,
         trusted_consensus_state: Vec<u8>,
         proof: Vec<u8>,
-    ) -> Result<(Vec<u8>, Vec<IntermediateState>), Error>;
+    ) -> Result<(Vec<u8>, HashMap<StateMachineId, StateMachineHeight>), Error>;
 
     /// Given two distinct consensus proofs, verify that they're both valid and represent conflicting views of the network.
     /// returns Ok(()) if they're both valid.
@@ -53,7 +53,7 @@ Now that we have a way to verify the consensus proofs of a blockchain in a fully
 
 ## `StateMachineClient`
 
-The state machine client is an abstraction of the state proof scheme for a given state machine. ISMP permits a consensus client to have as many state machines as possible, and it allows these different state machines to leverage different state proof schemes. With this abstraction in place, ISMP is future-proofed and can work for both monolithic and modular blockchain architectures such as Polkadot, Ethereum, Celestia etc. 
+The state machine client is an abstraction over the state proof scheme for a given state machine. ISMP permits a consensus client to have as many state machines as possible, and it allows these different state machines to leverage different state proof schemes. With this abstraction in place, ISMP is future-proofed and can work for both monolithic and modular blockchain architectures such as Polkadot, Ethereum, Celestia etc. 
 
 ![state machines](./assets/state-machine.svg)
 
