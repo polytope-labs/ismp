@@ -66,7 +66,7 @@ trait IsmpHost {
     /// Delete a request commitment from storage, used when a request is timed out
     fn delete_request_commitment(&self, req: &Request) -> Result<(), Error>;
 
-    /// Stores a receipt for an incoming request after it is successfully routed to a module
+    /// Stores a receipt for an incoming request after it is successfully routed to a module.
     /// Prevents duplicate incoming requests from being processed.
     fn store_request_receipt(&self, req: &Request) -> Result<(), Error>;
 
