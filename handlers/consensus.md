@@ -2,7 +2,7 @@
 
 ISMP exposes a set of handlers that allows users to manage the state of it's various consensus clients.
 
-## `CreateConsensusClientMessage`
+## `consensus::create_client(IsmpHost, CreateConsensusClientMessage)`
 
 The is defined as:
 
@@ -52,7 +52,7 @@ pub struct CreateConsensusClientMessage {
 This should be a subjectively chosen initial state for a consensus client. A sort of trusted setup for the initiated. Because it is subjectively chosen, it is recommended that this message is initiated either by the "admin" of the state machine or through a quorum of votes which allows the network to properly audit the contents of the initial consensus state. The handler for this message simply persists the consensus client and all of it's intermediate states as 
 
 
-## `ConsensusMessage`
+## `consensus::update_client(IsmpHost, ConsensusMessage)`
 
 ```rust
 pub struct ConsensusMessage {
@@ -66,7 +66,7 @@ pub struct ConsensusMessage {
 The handler uses the `IsmpHost` to fetch the appropriate [`ConsensusClient`](../consensus-client.md) implementation, invoking it's `verify_consensus_proof` method with the provided proof, and a trusted consensus state. If consensus proof verification is successful, the handler should persist the latest state commitments for each state machine returned.
 
 
-## `FraudProofMessage`
+## `consensus::fraud_proof(IsmpHost, FraudProofMessage)`
 
 ```rust
 pub struct FraudProofMessage {
