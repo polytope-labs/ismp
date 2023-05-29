@@ -1,8 +1,8 @@
 # Path of a request and response
 
-At it’s core ISMP is a request response protocol bearing some similarities with HTTP, this means that an actor makes a
-request from a state machine to be delivered to a counterparty state machine,  
-then the counterparty creates a response to be forwarded back to the source after the request is processed.
+ISMP is a request response protocol bearing some similarities with HTTP, this means that a module makes a
+request from a state machine to be delivered to another module on a counterparty state machine,  
+then the counterparty module creates a response to be forwarded back to the source after the request is processed.
 
 An ISMP request can either be POST or GET similar to what is obtainable in HTTP.
 
@@ -43,18 +43,18 @@ enum Request {
 }
 ```
 
-A post request is an intent to execute some program on the counterparty state machine, it carries a payload, some opaque
-bytes of to be delivered to the destination program on the counterparty state machine.
+A post request is an intent to execute some instruction on the counterparty state machine, it carries a payload which is
+some opaque bytes of to be delivered to the destination module on the counterparty state machine.
 
 A GET request is an intent to fetch values for some keys in the database of the counterparty state machine.
 
-While a POST request needs to be delivered to the counterparty for processing, a GET request is processed offchain by a
-relayer.
+While a POST request needs to be delivered to the counterparty for processing, a GET request is processed entirely
+offchain by any interested party.
 
 ### Life Cycle of a Request and Response
 
 A request is created and dispatched by the `IsmpDispatch::dispatch_request`, a commitment of that
-request which is a keccak256 hash of the request is inserted into the state trie, and a `Request` event is emitted, this
+request which is a keccak256 hash of the request is inserted into the state trie and a `Request` event is emitted, this
 event informs any party that wishes to relay the requests to be aware of the existence of a new request.
 
 A `RequestMessage` that contains the request alongside a proof of membership is then submitted to the counterparty
@@ -67,8 +67,7 @@ be relayed back to the source chain.
 
 A response to a post request is created and dispatched by the `IsmpDispatch::dispatch_response`, a
 commitment of that response which is a keccak256 hash of the response is inserted into the state trie, and a `Response`
-event is emitted, this event informs any party that wishes to relay the responses to be aware of the existence of a new
-response.
+event is emitted, this event informs any party that wishes to relay the response to be aware of its existence.
 
 A `ResponseMessage` that contains the response alongside a proof of membership is then submitted to the counterparty
 chain, after verifying this proof, a receipt for the response is committed to storage, the receipt is used to prevent
@@ -83,20 +82,47 @@ a request that was already successfully executed on the destination. Timeout mes
 non-membership.
 
 Timeouts for Get requests are evaluated relative to the timestamp of the sending chain, the timestamp represents the
-time on the sending chain after which responses to a Get request will be rejected.
+time on the sending chain after which responses to a Get request will be rejected, no proofs are required.
 
-### Responses
+### Response Structure
 
-There are two kind of responses in ISMP, the response to a post request contains some opaque bytes that would be decoded
+There are two kind of responses in ISMP, the response to a Post request contains some opaque bytes that would be decoded
 by the destination module on the receiving chain.
 
-The response to a get request is a state proof for the requested keys, the values for each key would be extracted from
-the proof.
+The response to a Get request is a map of keys to values, the values for each key would be extracted from
+the state proof in the response message.
+
+```rust
+/// Response to a Post request
+pub struct PostResponse {
+    /// The request that triggered this response.
+    pub post: Post,
+    /// The response message.
+    pub response: Vec<u8>,
+}
+
+/// The response to a Get request
+pub struct GetResponse {
+    /// The Get request that triggered this response.
+    pub get: Get,
+    /// Values derived from the state proof
+    pub values: BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+}
+
+/// An ISMP Response
+pub enum Response {
+    /// The response to a POST request
+    Post(PostResponse),
+    /// The response to a GET request
+    Get(GetResponse),
+}
+
+```
 
 ### How requests and responses flow in storage
 
 The protocol requires that a commitment(a keccak256 hash) for outgoing requests and responses be committed into the
-state trie by the router.
+state trie by the `IsmpDispatcher`.
 
 For incoming requests, a receipt is stored for the request in storage, this helps prevent processing duplicate
 requests, it’s also necessary for generating non membership proofs for request timeouts.
@@ -109,7 +135,7 @@ Commitments to storage are the means through which state machine clients verify 
 machine.  
 In ISMP it is required that a state machine commits a cryptographic hash of either a request or response to it's state
 trie.
-Hashing requests and responses is described in the functions below:
+The process for hashing requests and responses is described in the functions below:
 
 ```rust
 /// Return the keccak256 hash of a request

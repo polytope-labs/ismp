@@ -45,9 +45,9 @@ pub enum ResponseMessage {
 
 ## Validating state machine
 
-Before messages are processed the consensus client and state machine need to be validated, there needs to be a check
-for expired and frozen clients, as well as a check that ensures the challenge period for the state commitment referred
-to by the proof has elapsed.
+Before messages are processed the consensus client and state machine need to be validated, they both need to be checked
+to ensure they are not expired or frozen, lastly a check that ensures the challenge period for the state commitment referred
+to by the proof has elapsed needs to be present, message handling can only proceed if these checks pass.
 The client validation algorithm is described as follows:
 
 ```rust
@@ -101,7 +101,7 @@ fn validate_state_machine<H>(
 
 To handle incoming request messages, the consensus client and state machine are validated using the algorithm described
 in the previous section.
-The request timeout is also verified to ensure the request has not expired.
+The request timeout is verified to ensure the request has not expired.
 The proof is verified and the router is called to dispatch the requests to the destination modules.
 A receipt of this request is stored to prevent any duplicate from being handled in the future.
 
@@ -192,7 +192,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
                 .collect::<Result<Vec<_>, _>>()?
         }
         ResponseMessage::Get { requests, proof } => {
-            // Ensure the proof height is greater than each retrieval height specified in the Get
+            // Ensure the proof height is equal to each retrieval height specified in the Get
             // requests
             sufficient_proof_height(&requests, &proof)?;
             // Since each get request can  contain multiple storage keys, we should handle them
@@ -225,7 +225,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
 ## Timeout handler
 
 Timeouts are handled differently for Post and Get requests. For post requests the timeout is evaluated relative to the
-destination chain's timestamp along side a proof of non-membership.
+destination chain's timestamp alongside a proof of non-membership.
 Get request timeouts are processed without any proof, the timeout is just evaluated relative to the source chain's
 timestamp just, this is because Get requests are never delivered to the counterparty chain, but are processed offchain
 by interested parties.
