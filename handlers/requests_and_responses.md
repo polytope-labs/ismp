@@ -102,12 +102,12 @@ The proof is verified and the router is called to dispatch the requests to the d
 A receipt of this request is stored to prevent any duplicate from being handled in the future.
 
 ```rust
-pub fn handle<H>(host: &H, msg: RequestMessage) -> Result<MessageResult, Error>
+pub fn handle<H>(host: &H, msg: RequestMessage) -> Result<(), Error>
     where
         H: IsmpHost,
 {
     let state_machine = validate_state_machine(host, msg.proof.height)?;
-    // Verify membership proof
+ 
     let state = host.state_machine_commitment(msg.proof.height)?;
 
     state_machine.verify_membership(
@@ -118,8 +118,8 @@ pub fn handle<H>(host: &H, msg: RequestMessage) -> Result<MessageResult, Error>
     )?;
 
     let router = host.ismp_router();
-    // If a receipt exists for any request then it's a duplicate and it is not dispatched
-    let result = msg
+    // If a receipt exists for any request or it has timed out it is not dispatched
+    msg
         .requests
         .into_iter()
         .filter(|req| host.request_receipt(req).is_none() || req.timed_out(host.timestamp()))
@@ -130,7 +130,7 @@ pub fn handle<H>(host: &H, msg: RequestMessage) -> Result<MessageResult, Error>
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(MessageResult::Request(result))
+    Ok(())
 }
 ```
 
@@ -145,7 +145,7 @@ requests.
 
 ```rust
 /// Validate the state machine, verify the response message and dispatch the message to the router
-pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
+pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<(), Error>
     where
         H: IsmpHost,
 {
@@ -157,7 +157,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
 
     let state = host.state_machine_commitment(msg.proof().height)?;
 
-    let result = match msg {
+     match msg {
         ResponseMessage::Post { responses, proof } => {
             // Verify membership proof
             state_machine.verify_membership(
@@ -204,7 +204,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
         }
     };
 
-    Ok(MessageResult::Response(result))
+    Ok(())
 }
 
 ```
@@ -218,11 +218,11 @@ timestamp just, this is because Get requests are never delivered to the counterp
 by interested parties.
 
 ```rust
-pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<MessageResult, Error>
+pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<(), Error>
     where
         H: IsmpHost,
 {
-    let results = match msg {
+    match msg {
         TimeoutMessage::Post { requests, timeout_proof } => {
             let state_machine = validate_state_machine(host, timeout_proof.height)?;
             let state = host.state_machine_commitment(timeout_proof.height)?;
@@ -276,7 +276,7 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<MessageResult, Error>
         }
     };
 
-    Ok(MessageResult::Timeout(results))
+    Ok(())
 }
 
 ```

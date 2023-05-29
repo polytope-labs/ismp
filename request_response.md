@@ -1,4 +1,4 @@
-# Path of a request and response
+# Requests and responses
 
 ISMP is a request response protocol bearing some similarities with HTTP, this means that a module makes a
 request from a state machine to be delivered to another module on a counterparty state machine,  
