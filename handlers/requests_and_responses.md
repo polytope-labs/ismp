@@ -122,7 +122,7 @@ pub fn handle<H>(host: &H, msg: RequestMessage) -> Result<(), Error>
     msg
         .requests
         .into_iter()
-        .filter(|req| host.request_receipt(req).is_none() || req.timed_out(host.timestamp()))
+        .filter(|req| host.request_receipt(req).is_none() || !req.timed_out(state.timestamp()))
         .map(|request| {
             let res = router.handle_request(request.clone());
             host.store_request_receipt(&request)?;
@@ -199,7 +199,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<(), Error>
                         get: request.get_request()?,
                         values: keys.into_iter().zip(values.into_iter()).collect(),
                     });
-                    host.store_request_receipt(&request.get_request()?)?;
+                    host.store_request_receipt(&request)?;
                     Ok(res)
                 })
                 .collect::<Result<Vec<_>, _>>()?
@@ -233,7 +233,7 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<(), Error>
                 check_for_commitment_existence(request)?;
 
                 // Ensure the get timeout has elapsed on the host
-                if !request.timed_out(host.timestamp()) {
+                if !request.timed_out(state.timestamp()) {
                     Err(Error::RequestTimeoutNotElapsed)?
                 }
             }
