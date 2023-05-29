@@ -188,6 +188,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<(), Error>
             // individually
             requests
                 .into_iter()
+                .filter(|req| host.request_receipt(req).is_none())
                 .map(|request| {
                     let keys = request.keys()?;
                     let values =
@@ -198,6 +199,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<(), Error>
                         get: request.get_request()?,
                         values: keys.into_iter().zip(values.into_iter()).collect(),
                     });
+                    host.store_request_receipt(&request.get_request()?)?;
                     Ok(res)
                 })
                 .collect::<Result<Vec<_>, _>>()?
