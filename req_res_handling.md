@@ -63,11 +63,7 @@ fn verify_challenge_period_elapsed<H>(host: &H, proof_height: StateMachineHeight
     if current_timestamp - update_time > delay_period {
         Ok(())
     } else {
-        Err(Error::ChallengePeriodNotElapsed {
-            consensus_id: proof_height.id.consensus_client,
-            current_time: host.timestamp(),
-            update_time: host.consensus_update_time(proof_height.id.consensus_client)?,
-        })
+        Err(Error::ChallengePeriodNotElapsed)
     }
 }
 
@@ -155,16 +151,8 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
 {
     let state_machine = validate_state_machine(host, msg.proof().height)?;
     for request in &msg.requests() {
-        // For a response to be valid a request commitment must be present in storage
-        let commitment = host.request_commitment(request)?;
-
-        if commitment != hash_request(request) {
-            return Err(Error::RequestCommitmentNotFound {
-                nonce: request.nonce(),
-                source: request.source_chain(),
-                dest: request.dest_chain(),
-            });
-        }
+        // Ensure a commitment exists for all requests in the batch
+        check_for_commitment_existence(request)?;
     }
 
     let state = host.state_machine_commitment(msg.proof().height)?;
@@ -185,6 +173,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
                 .into_iter()
                 .filter(|res| host.response_receipt(res).is_none())
                 .map(|response| {
+                    // Dispatch to modules
                     let res = router.handle_response(response.clone());
                     host.store_response_receipt(&response)?;
                     Ok(res)
@@ -194,15 +183,13 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<MessageResult, Error>
         ResponseMessage::Get { requests, proof } => {
             // Ensure the proof height is equal to each retrieval height specified in the Get
             // requests
-            sufficient_proof_height(&requests, &proof)?;
+            check_for_sufficient_proof_height(&requests, &proof)?;
             // Since each get request can  contain multiple storage keys, we should handle them
             // individually
             requests
                 .into_iter()
                 .map(|request| {
-                    let keys = request.keys().ok_or_else(|| {
-                        Error::ImplementationSpecific("Missing keys for get request".to_string())
-                    })?;
+                    let keys = request.keys()?;
                     let values =
                         state_machine.verify_state_proof(host, keys.clone(), state, &proof)?;
 
@@ -241,23 +228,11 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<MessageResult, Error>
             let state = host.state_machine_commitment(timeout_proof.height)?;
             for request in &requests {
                 // Ensure a commitment exists for all requests in the batch
-                let commitment = host.request_commitment(request)?;
-                if commitment != hash_request(request) {
-                    return Err(Error::RequestCommitmentNotFound {
-                        nonce: request.nonce(),
-                        source: request.source_chain(),
-                        dest: request.dest_chain(),
-                    });
-                }
+                check_for_commitment_existence(request)?;
 
-                if !request.timed_out(state.timestamp()) {
-                    Err(Error::RequestTimeoutNotElapsed {
-                        nonce: request.nonce(),
-                        source: request.source_chain(),
-                        dest: request.dest_chain(),
-                        timeout_timestamp: request.timeout(),
-                        state_machine_time: state.timestamp(),
-                    })?
+                // Ensure the get timeout has elapsed on the host
+                if !request.timed_out(host.timestamp()) {
+                    Err(Error::RequestTimeoutNotElapsed)?
                 }
             }
 
@@ -266,7 +241,7 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<MessageResult, Error>
             let values = state_machine.verify_state_proof(host, key, state, &timeout_proof)?;
 
             if values.into_iter().any(|val| val.is_some()) {
-                Err(Error::ImplementationSpecific("Some Requests not timed out".into()))?
+                Err(Error::SomeRequestsInTheBatchDidNotTimeout)?
             }
 
             let router = host.ismp_router();
@@ -281,10 +256,8 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<MessageResult, Error>
         }
         TimeoutMessage::Get { requests } => {
             for request in &requests {
-                let commitment = host.request_commitment(request)?;
-                if commitment != hash_request(request) {
-                    return Err(Error::RequestCommitmentNotFound);
-                }
+                // Ensure a commitment exists for all requests in the batch
+                check_for_commitment_existence(request)?;
 
                 // Ensure the get timeout has elapsed on the host
                 if !request.timed_out(host.timestamp()) {
