@@ -47,7 +47,7 @@ pub struct CreateConsensusClientMessage {
 
 ```
 
-This should be a subjectively chosen initial state for a consensus client. A sort of trusted setup for the initiated. Because it is subjectively chosen, it is recommended that this message is initiated either by the "admin" of the state machine or through a quorum of votes which allows the network to properly audit the contents of the initial consensus state. The handler for this message simply persists the consensus client and all of it's intermediate states as 
+This should be a subjectively chosen initial state for a consensus client. A sort of trusted setup for the initiated. Because it is subjectively chosen, it is recommended that this message is initiated either by the "admin" of the state machine or through a quorum of votes which allows the network to properly audit the contents of the initial consensus state. The handler for this message simply persists the consensus client and all of it's intermediate states as is to storage. 
 
 
 ## `fn update_client(host: &dyn IsmpHost, message: ConsensusMessage)`
