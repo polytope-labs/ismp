@@ -1,4 +1,4 @@
-# ISMP Dispatch
+# ISMP Dispatcher
 
 The dispatcher is the public interface which modules use to create requests and responses.
 The dispatcher should be the only public interface through which modules interact with the protocol.
@@ -6,7 +6,7 @@ The dispatcher should emit relevant events after any dispatch
 The interface for the Ismp Dispatcher is:
 
 ```rust
-    pub trait IsmpDispatch {
+    pub trait IsmpDispatcher {
     /// This function should accept requests from modules and commit them to the state
     /// It should emit the `Request` event after a successful dispatch
     fn dispatch_request(&self, request: Request) -> Result<(), Error>;
