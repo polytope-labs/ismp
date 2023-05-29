@@ -51,27 +51,36 @@ A GET request is an intent to fetch values for some keys in the database of the 
 While a POST request needs to be delivered to the counterparty for processing, a GET request is processed offchain by a
 relayer.
 
-## Life Cycle of a Request
+### Life Cycle of a Request and Response
 
-When a request is initialised on a source chain, a commitment of that request which is a keccak256 hash of the request
-is inserted into its state trie, and an event is emitted, this event informs any party that wishes to relay the requests
-to be aware of the existence of a new request.
+A request is created and dispatched by the `IsmpDispatch::dispatch_request`, a commitment of that
+request which is a keccak256 hash of the request is inserted into the state trie, and a `Request` event is emitted, this
+event informs any party that wishes to relay the requests to be aware of the existence of a new request.
 
-A message that contains the request alongside a proof of membership is then submitted to the destination chain, on
-verifying this proof and processing the request, a receipt for the request is committed to storage, the destination
+A `RequestMessage` that contains the request alongside a proof of membership is then submitted to the counterparty
+chain, after verifying this proof, a receipt for the request is committed to storage, the destination
 module or contract can create a response synchronously or asynchronously, whenever this response is available it would
 be relayed back to the source chain.
 
 ![](./assets/ismp_request.drawio.png)
 ![](./assets/get_request.drawio.png)
 
+A response to a post request is created and dispatched by the `IsmpDispatch::dispatch_response`, a
+commitment of that response which is a keccak256 hash of the response is inserted into the state trie, and a `Response`
+event is emitted, this event informs any party that wishes to relay the responses to be aware of the existence of a new
+response.
+
+A `ResponseMessage` that contains the response alongside a proof of membership is then submitted to the counterparty
+chain, after verifying this proof, a receipt for the response is committed to storage, the receipt is used to prevent
+processing duplicate responses.
+
 ### Timeouts
 
-Both Post and Get requests have a timeout, a POST request timeout is evaluated based on the timestamp of the destination
-chain, this means that packets cannot timeout if the destination change does not progress, using the destination chain
-timestamp instead of the source chain’s timestamp prevents situations where a bad actor could submit a timeout for a
-request that was already successfully executed on the destination, which in situations that involve token transfers,
-would be a double spend.
+Both Post and Get requests have a timeout, a Post request timeout is evaluated based on the timestamp of the destination
+chain, this means that post requests cannot time out if the destination chain does not progress, using the destination
+chain timestamp instead of the source chain’s timestamp prevents situations where a bad actor could submit a timeout for
+a request that was already successfully executed on the destination. Timeout messages are accompanied by a proof of
+non-membership.
 
 Timeouts for Get requests are evaluated relative to the timestamp of the sending chain, the timestamp represents the
 time on the sending chain after which responses to a Get request will be rejected.
@@ -100,7 +109,8 @@ Commitments to storage are the means through which state machine clients verify 
 machine.  
 In ISMP it is required that a state machine commits a cryptographic hash of either a request or response to it's state
 trie.
-Hashing requests and responses is described in the functions below:  
+Hashing requests and responses is described in the functions below:
+
 ```rust
 /// Return the keccak256 hash of a request
 pub fn hash_request<H: IsmpHost>(req: &Request) -> H256 {

@@ -9,7 +9,7 @@ The interface for the Ismp Dispatcher is:
     pub trait IsmpDispatcher {
     /// This function should accept requests from modules and commit them to the state
     /// It should emit the `Request` event after a successful dispatch
-    fn dispatch_request(&self, request: Request) -> Result<(), Error>;
+    fn dispatch_request(&self, request: DispatchRequest) -> Result<(), Error>;
 
     /// This function should accept responses from modules and commit them to the state
     /// It should emit the `Response` event after a successful dispatch
@@ -19,7 +19,7 @@ The interface for the Ismp Dispatcher is:
 
 ### Events
 
-Events should be emitted for state machine updates, outgoing requests and responses.This allows offchain components
+Events should be emitted for state machine updates and when requests are responses are dispatched.This allows offchain components
 to be notified when new messages need to be relayed.  
 The structure of ISMP events is described below:
 
