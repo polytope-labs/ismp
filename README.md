@@ -1,7 +1,6 @@
 # Interoperable State Machine Protocol 
 
-This repo hosts the specification for the interoperable state machine protocol. 
-
+This repo hosts the specification for the Interoperable State Machine Protocol. 
 
 
 ## License

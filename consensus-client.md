@@ -8,13 +8,23 @@ Recall that the consensus mechanism is responsible for coming to a consensus abo
 
 This document formally defines the `ConsensusClient`, which serves as an oracle for the canonical state of a state machine, and the corresponding `ConsensusMessage`, which is used to advance the state of the consensus client.
 
+
+## `ConsensusState`
+
+We define the `ConsensusState` as the minimum data required by consensus clients in order to verify incoming consensus messages and advance it's view of the state machines running on this consenus system.
+
+
 ## `ConsensusClient`
 
 The consensus client is one half of a full blockchain client. It verifies only consensus proofs to advance its view of the blockchain network, where full nodes verify both consensus proofs and the state transition function of the network. This makes consensus clients suitable for resource-constrained environments like blockchains, enabling them to become interoperable with other blockchains in a trust-free manner.
 
 The search for a mechanism by which a consensus client may observe and come to conclusions about the canonical state of another blockchain leads us to understand the concept of safety in distributed systems. We elaborate further on this in our research article on consensus proofs $^{[1]}$. In summary, we show that safety in on-chain consensus clients will require the use of a challenge window, even after consensus proof verification. This allows us to detect potential Byzantine behavior that may arise without the challenge window in place.
 
+
 ```rust
+/// The consensus state of the consensus client
+type ConsensusState = Vec<u8>;
+
 /// We define the consensus client as a module that handles logic for consensus & fraud proof verification,
 pub trait ConsensusClient {
     /// Verify the associated consensus proof, using the trusted consensus state.
@@ -23,10 +33,10 @@ pub trait ConsensusClient {
         host: &dyn IsmpHost,
         trusted_consensus_state: Vec<u8>,
         proof: Vec<u8>,
-    ) -> Result<(Vec<u8>, HashMap<StateMachineId, StateMachineHeight>), Error>;
+    ) -> Result<(Vec<u8>, HashMap<StateMachine, StateMachineHeight>), Error>;
 
     /// Given two distinct consensus proofs, verify that they're both valid and represent conflicting views of the network.
-    /// returns Ok(()) if they're both valid.
+    /// Should return Ok(()) if they're both valid.
     fn verify_fraud_proof(
         &self,
         host: &dyn IsmpHost,
@@ -39,7 +49,7 @@ pub trait ConsensusClient {
     fn unbonding_period(&self) -> Duration;
 
     /// Return an implementation of a [`StateMachineClient`] for the given state mahcine identifier. Return an error if the identifier is unknown.
-    fn state_machine(&self, state_machine_id: StateMachineId) -> Result<Box<dyn StateMachineClient>, Error>;
+    fn state_machine(&self, state_machine_id: StateMachine) -> Result<Box<dyn StateMachineClient>, Error>;
 }
 ```
 
