@@ -27,7 +27,7 @@ pub struct StateMachineId {
 /// Identifies a state machine at a given height
 pub struct StateMachineHeight {
     /// The state machine identifier
-    pub commitment: StateCommitment,
+    pub id: StateMachineId,
     /// the corresponding block height
     pub height: u64,
 }
@@ -42,7 +42,7 @@ pub struct CreateConsensusClientMessage {
     /// Consensus client id
     pub consensus_client_id: ConsensusClientId,
     /// State machine commitments
-    pub state_machine_commitments: Vec<(StateMachineId, StateMachineHeight)>,
+    pub state_machine_commitments: Vec<(StateMachineId, StateCommitmentHeight)>,
 }
 
 ```

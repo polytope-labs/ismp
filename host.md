@@ -10,7 +10,7 @@ pub trait IsmpHost {
     /// Should return the latest height of the state machine
     fn latest_commitment_height(&self, id: StateMachineId) -> Result<u64, Error>;
 
-    /// Should return the state machine at the given height
+    /// Should return the state machine commitment at the given height
     fn state_machine_commitment(
         &self,
         height: StateMachineHeight,
@@ -92,7 +92,7 @@ pub trait IsmpHost {
     /// Should return the configured delay period for a consensus client
     fn challenge_period(&self, id: ConsensusClientId) -> Duration;
 
-    /// Check if the client has expired since the last update
+    /// Check if the client unbonding period has expired since the last update
     fn is_expired(&self, consensus_id: ConsensusClientId) -> Result<(), Error> {
         let host_timestamp = self.timestamp();
         let unbonding_period = self.consensus_client(consensus_id)?.unbonding_period();
