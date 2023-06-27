@@ -56,8 +56,7 @@ pub trait IsmpDispatcher {
 ### Events
 
 Events should be emitted for state machine updates and when requests are responses are dispatched.This allows offchain
-components
-to be notified when new messages need to be relayed.  
+components to be notified when new messages need to be relayed.  
 The structure of ISMP events is described below:
 
 ```rust
