@@ -114,7 +114,7 @@ pub struct PostResponse {
 pub struct GetResponse {
     /// The Get request that triggered this response.
     pub get: Get,
-    /// Values derived from the state proof
+    /// Values extracted from the state proof
     pub values: BTreeMap<Vec<u8>, Option<Vec<u8>>>,
 }
 
@@ -123,6 +123,8 @@ pub enum Response {
     /// The response to a POST request
     Post(PostResponse),
     /// The response to a GET request
+    /// Note: This variant is use internally by the framework to dispatch get responses to the modules after state proofs are verified
+    /// it is never committed to storage.
     Get(GetResponse),
 }
 

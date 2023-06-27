@@ -29,7 +29,7 @@ The required module interface is:
 pub trait IsmpModule {
     /// Called by the ISMP router on a module, to notify module of a new request
     /// the module may choose to respond immediately, or in a later block
-    fn on_accept(request: Request) -> Result<(), Error>;
+    fn on_accept(request: Post) -> Result<(), Error>;
     /// Called by the router on a module, to notify module of a response to a previously sent out
     /// request
     fn on_response(response: Response) -> Result<(), Error>;

@@ -60,7 +60,7 @@ pub trait QueryInterface {
         block_numbers: Vec<u32>,
     ) -> Result<HashMap<u32, Vec<Event>>>;
 
-    /// Query pending get requests that have a specified retrieval height <=  `height`.
+    /// Query get requests that have no response receipt that have a specified retrieval height <=  `height`.
     fn pending_get_requests(&self, height: u64) -> Result<Vec<Get>>;
 }
 ```
