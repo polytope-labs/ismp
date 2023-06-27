@@ -7,44 +7,53 @@ then the counterparty module creates a response to be forwarded back to the sour
 An ISMP request can either be POST or GET similar to what is obtainable in HTTP.
 
 ```rust
-enum Request {
-    Post {
-        /// The source state machine of this request.
-        source_chain: StateMachine,
-        /// The destination state machine of this request.
-        dest_chain: StateMachine,
-        /// The nonce of this request on the source chain
-        nonce: u64,
-        /// Module or contract Id of the sending module
-        from: Vec<u8>,
-        /// Module or contract Id of the receiving module
-        to: Vec<u8>,
-        /// Timestamp which this request expires in seconds.
-        timeout_timestamp: u64,
-        /// Encoded Request.
-        data: Vec<u8>,
-    },
-    Get {
-        /// The source state machine of this request.
-        source_chain: StateMachine,
-        /// The destination state machine of this request.
-        dest_chain: StateMachine,
-        /// The nonce of this request on the source chain
-        nonce: u64,
-        /// Module or contract Id of the sending module
-        from: Vec<u8>,
-        /// Storage keys that this request is interested in.
-        keys: Vec<Vec<u8>>,
-        /// Height at which to read the state machine.
-        height: u64,
-        /// Timestamp which this request expires in seconds
-        timeout_timestamp: u64,
-    }
+pub struct Post {
+    /// The source state machine of this request.
+    pub source_chain: StateMachine,
+    /// The destination state machine of this request.
+    pub dest_chain: StateMachine,
+    /// The nonce of this request on the source chain
+    pub nonce: u64,
+    /// Module Id of the sending module
+    pub from: Vec<u8>,
+    /// Module ID of the receiving module
+    pub to: Vec<u8>,
+    /// Timestamp which this request expires in seconds.
+    pub timeout_timestamp: u64,
+    /// Encoded Request.
+    pub data: Vec<u8>,
+}
+
+/// The ISMP GET request.
+pub struct Get {
+    /// The source state machine of this request.
+    pub source_chain: StateMachine,
+    /// The destination state machine of this request.
+    pub dest_chain: StateMachine,
+    /// The nonce of this request on the source chain
+    pub nonce: u64,
+    /// Module Id of the sending module
+    pub from: Vec<u8>,
+    /// Raw Storage keys that would be used to fetch the values from the counterparty
+    pub keys: Vec<Vec<u8>>,
+    /// Height at which to read the state machine.
+    pub height: u64,
+    /// Host timestamp at which this request expires in seconds
+    pub timeout_timestamp: u64,
+}
+
+pub enum Request {
+    /// A post request allows a module on a state machine to send arbitrary bytes to another module
+    /// living in another state machine.
+    Post(Post),
+    /// A get request allows a module on a state machine to read the storage of another module
+    /// living in another state machine.
+    Get(Get),
 }
 ```
 
 A post request is an intent to execute some instruction on the counterparty state machine, it carries a payload which is
-some opaque bytes of to be delivered to the destination module on the counterparty state machine.
+some opaque bytes to be delivered to the destination module on the counterparty state machine.
 
 A GET request is an intent to fetch values for some keys in the database of the counterparty state machine.
 
