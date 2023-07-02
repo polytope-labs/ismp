@@ -46,8 +46,8 @@ pub enum ResponseMessage {
 ## Validating state machine
 
 Before messages are processed the consensus client and state machine need to be validated, they both need to be checked
-to ensure they are not expired or frozen, lastly a check that ensures the challenge period for the state commitment referred
-to by the proof has elapsed needs to be present, message handling can only proceed if these checks pass.
+to ensure they are not expired or frozen, lastly a check that ensures the challenge period for the state commitment
+referred to by the proof has elapsed needs to be present, message handling can only proceed if these checks pass.  
 The client validation algorithm is described as follows:
 
 ```rust
@@ -107,26 +107,31 @@ pub fn handle<H>(host: &H, msg: RequestMessage) -> Result<(), Error>
         H: IsmpHost,
 {
     let state_machine = validate_state_machine(host, msg.proof.height)?;
- 
+    // Verify membership proof
     let state = host.state_machine_commitment(msg.proof.height)?;
 
     state_machine.verify_membership(
         host,
-        RequestResponse::Request(msg.requests.clone()),
+        RequestResponse::Request(msg.requests.clone().into_iter().map(Request::Post).collect()),
         state,
         &msg.proof,
     )?;
 
     let router = host.ismp_router();
-    // If a receipt exists for any request or it has timed out it is not dispatched
+    // If a receipt exists for any request then it's a duplicate and it is not dispatched
     msg
         .requests
         .into_iter()
-        .filter(|req| host.request_receipt(req).is_none() && !req.timed_out(state.timestamp()))
+        .filter(|req| {
+            let req = Request::Post(req.clone());
+            host.request_receipt(&req).is_none() && !req.timed_out(state.timestamp())
+        })
         .map(|request| {
-            let res = router.handle_request(request.clone());
-            host.store_request_receipt(&request)?;
-            Ok(res)
+            let cb = router.module_for_id(request.to.clone())?;
+            cb
+                .on_accept(request.clone());
+            host.store_request_receipt(&Request::Post(request))?;
+            Ok(())
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -150,15 +155,22 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<(), Error>
         H: IsmpHost,
 {
     let state_machine = validate_state_machine(host, msg.proof().height)?;
-    for request in &msg.requests() {
-        // Ensure a commitment exists for all requests in the batch
-        check_for_commitment_existence(request)?;
-    }
 
     let state = host.state_machine_commitment(msg.proof().height)?;
 
-     match msg {
+    match msg {
         ResponseMessage::Post { responses, proof } => {
+            // For a response to be valid a request commitment must be present in storage
+            // Also we must not have received a response for this request
+            let responses = responses
+                .into_iter()
+                .filter(|response| {
+                    let request = response.request();
+                    let commitment = hash_request::<H>(&request);
+                    host.request_commitment(commitment).is_ok() &&
+                        host.response_receipt(&request).is_none()
+                })
+                .collect::<Vec<_>>();
             // Verify membership proof
             state_machine.verify_membership(
                 host,
@@ -171,36 +183,46 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<(), Error>
 
             responses
                 .into_iter()
-                .filter(|res| host.response_receipt(res).is_none())
                 .map(|response| {
-                    // Dispatch to modules
-                    let res = router.handle_response(response.clone());
-                    host.store_response_receipt(&response)?;
-                    Ok(res)
+                    let cb = router.module_for_id(response.destination_module())?;
+                    cb
+                        .on_response(response.clone());
+                    host.store_response_receipt(&response.request())?;
+                    Ok(())
                 })
                 .collect::<Result<Vec<_>, _>>()?
         }
         ResponseMessage::Get { requests, proof } => {
-            // Ensure the proof height is equal to each retrieval height specified in the Get
+            let requests = requests
+                .into_iter()
+                .filter(|request| {
+                    let commitment = hash_request::<H>(request);
+                    host.request_commitment(commitment).is_ok() &&
+                        host.response_receipt(request).is_none()
+                })
+                .collect::<Vec<_>>();
+            // Ensure the proof height is greater than each retrieval height specified in the Get
             // requests
-            check_for_sufficient_proof_height(&requests, &proof)?;
+            sufficient_proof_height(&requests, &proof)?;
             // Since each get request can  contain multiple storage keys, we should handle them
             // individually
             requests
                 .into_iter()
-                .filter(|req| host.request_receipt(req).is_none())
                 .map(|request| {
-                    let keys = request.keys()?;
-                    let values =
-                        state_machine.verify_state_proof(host, keys.clone(), state, &proof)?;
+                    let keys = request.keys().ok_or_else(|| {
+                        Error::ImplementationSpecific("Missing keys for get request".to_string())
+                    })?;
+                    let values = state_machine.verify_state_proof(host, keys, state, &proof)?;
 
                     let router = host.ismp_router();
-                    let res = router.handle_response(Response::Get {
-                        get: request.get_request()?,
-                        values: keys.into_iter().zip(values.into_iter()).collect(),
-                    });
-                    host.store_request_receipt(&request)?;
-                    Ok(res)
+                    let cb = router.module_for_id(request.source_module())?;
+                    cb
+                        .on_response(Response::Get(GetResponse {
+                            get: request.get_request()?,
+                            values,
+                        }));
+                    host.store_response_receipt(&request)?;
+                    Ok(())
                 })
                 .collect::<Result<Vec<_>, _>>()?
         }
@@ -216,7 +238,7 @@ pub fn handle<H>(host: &H, msg: ResponseMessage) -> Result<(), Error>
 Timeouts are handled differently for Post and Get requests. For post requests the timeout is evaluated relative to the
 destination chain's timestamp alongside a proof of non-membership.
 Get request timeouts are processed without any proof, the timeout is just evaluated relative to the source chain's
-timestamp just, this is because Get requests are never delivered to the counterparty chain, but are processed offchain
+timestamp, this is because Get requests are never delivered to the counterparty chain, but are processed offchain
 by interested parties.
 
 ```rust
@@ -230,11 +252,17 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<(), Error>
             let state = host.state_machine_commitment(timeout_proof.height)?;
             for request in &requests {
                 // Ensure a commitment exists for all requests in the batch
-                check_for_commitment_existence(request)?;
+                let commitment = hash_request::<H>(request);
+                host.request_commitment(commitment)?;
 
-                // Ensure the get timeout has elapsed on the host
                 if !request.timed_out(state.timestamp()) {
-                    Err(Error::RequestTimeoutNotElapsed)?
+                    Err(Error::RequestTimeoutNotElapsed {
+                        nonce: request.nonce(),
+                        source: request.source_chain(),
+                        dest: request.dest_chain(),
+                        timeout_timestamp: request.timeout(),
+                        state_machine_time: state.timestamp(),
+                    })?
                 }
             }
 
@@ -242,15 +270,17 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<(), Error>
 
             let values = state_machine.verify_state_proof(host, key, state, &timeout_proof)?;
 
-            if values.into_iter().any(|val| val.is_some()) {
-                Err(Error::SomeRequestsInTheBatchDidNotTimeout)?
+            if values.into_iter().any(|(_key, val)| val.is_some()) {
+                Err(Error::ImplementationSpecific("Some requests in this batch did not time out".into()))?
             }
 
             let router = host.ismp_router();
             requests
                 .into_iter()
                 .map(|request| {
-                    let res = router.handle_timeout(request.clone());
+                    let cb = router.module_for_id(request.source_module())?;
+                    let res = cb
+                        .on_timeout(request.clone());
                     host.delete_request_commitment(&request)?;
                     Ok(res)
                 })
@@ -258,27 +288,34 @@ pub fn handle<H>(host: &H, msg: TimeoutMessage) -> Result<(), Error>
         }
         TimeoutMessage::Get { requests } => {
             for request in &requests {
-                // Ensure a commitment exists for all requests in the batch
-                check_for_commitment_existence(request)?;
+                let commitment = hash_request::<H>(request);
+                host.request_commitment(commitment)?;
 
                 // Ensure the get timeout has elapsed on the host
                 if !request.timed_out(host.timestamp()) {
-                    Err(Error::RequestTimeoutNotElapsed)?
+                    Err(Error::RequestTimeoutNotElapsed {
+                        nonce: request.nonce(),
+                        source: request.source_chain(),
+                        dest: request.dest_chain(),
+                        timeout_timestamp: request.timeout(),
+                        state_machine_time: host.timestamp(),
+                    })?
                 }
             }
             let router = host.ismp_router();
             requests
                 .into_iter()
                 .map(|request| {
-                    let res = router.handle_timeout(request.clone());
+                    let cb = router.module_for_id(request.source_module())?;
+                    let res = cb
+                        .on_timeout(request.clone());
                     host.delete_request_commitment(&request)?;
                     Ok(res)
                 })
                 .collect::<Result<Vec<_>, _>>()?
         }
-    };
+    }
 
     Ok(())
 }
-
 ```

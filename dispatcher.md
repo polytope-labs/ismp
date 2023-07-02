@@ -6,7 +6,43 @@ The dispatcher should emit relevant events after any dispatch
 The interface for the Ismp Dispatcher is:
 
 ```rust
-    pub trait IsmpDispatcher {
+/// Simplified POST request, intended to be used for sending outgoing requests
+pub struct DispatchPost {
+    /// The destination state machine of this request.
+    pub dest_chain: StateMachine,
+    /// Module Id of the sending module
+    pub from: Vec<u8>,
+    /// Module ID of the receiving module
+    pub to: Vec<u8>,
+    /// Timestamp which this request expires in seconds.
+    pub timeout_timestamp: u64,
+    /// Encoded Request.
+    pub data: Vec<u8>,
+}
+
+/// Simplified GET request, intended to be used for sending outgoing requests
+pub struct DispatchGet {
+    /// The destination state machine of this request.
+    pub dest_chain: StateMachine,
+    /// Module Id of the sending module
+    pub from: Vec<u8>,
+    /// Raw Storage keys that would be used to fetch the values from the counterparty
+    pub keys: Vec<Vec<u8>>,
+    /// Height at which to read the state machine.
+    pub height: u64,
+    /// Host timestamp at which this request expires in seconds
+    pub timeout_timestamp: u64,
+}
+
+/// Simplified request, intended to be used for sending outgoing requests
+pub enum DispatchRequest {
+    /// The POST variant
+    Post(DispatchPost),
+    /// The GET variant
+    Get(DispatchGet),
+}
+
+pub trait IsmpDispatcher {
     /// This function should accept requests from modules and commit them to the state
     /// It should emit the `Request` event after a successful dispatch
     fn dispatch_request(&self, request: DispatchRequest) -> Result<(), Error>;
@@ -19,8 +55,8 @@ The interface for the Ismp Dispatcher is:
 
 ### Events
 
-Events should be emitted for state machine updates and when requests are responses are dispatched.This allows offchain components
-to be notified when new messages need to be relayed.  
+Events should be emitted for state machine updates and when requests are responses are dispatched.This allows offchain
+components to be notified when new messages need to be relayed.  
 The structure of ISMP events is described below:
 
 ```rust

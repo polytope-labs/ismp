@@ -1,27 +1,17 @@
 # ISMP Router
 
-The router is the component between the ISMP message handlers and modules, the router functions as a
-dispatcher to the modules. The functions of the router are these:
-
-- It dispatches incoming requests and responses to destination modules.
-- It dispatches request timeouts to modules.
+The router lives between the ISMP message handlers and modules, the router provides access to the ismp      
+module which a request or response is designated for based on the destination module Id.
 
 The router should not be accessible outside the host.
 The interface for the ISMP Router is:
 
 ```rust
 pub trait IsmpRouter {
-    /// Dispatch incoming requests to destination modules
-    /// It internally decodes destination module id from the response and calls the `on_response` method of the module.
-    fn handle_request(&self, request: Request) -> Result<(), Error>;
-
-    /// Dispatch request timeouts to modules
-    /// It internally decodes destination module id from the response and calls the `on_response` method of the module.
-    fn handle_timeout(&self, request: Request) -> Result<(), Error>;
-    
-    /// Dispatch responses to destination modules
-    /// It internally decodes destination module id from the timeout and calls the `on_timeout` method of the module.
-    fn handle_response(&self, response: Response) -> Result<(), Error>;
+    /// Get module handler by id
+    /// Should decode the module id and return a handler to the appropriate `IsmpModule`
+    /// implementation
+    fn module_for_id(&self, bytes: Vec<u8>) -> Result<Box<dyn IsmpModule>, Error>;
 }
 ```
 
@@ -39,7 +29,7 @@ The required module interface is:
 pub trait IsmpModule {
     /// Called by the ISMP router on a module, to notify module of a new request
     /// the module may choose to respond immediately, or in a later block
-    fn on_accept(request: Request) -> Result<(), Error>;
+    fn on_accept(request: Post) -> Result<(), Error>;
     /// Called by the router on a module, to notify module of a response to a previously sent out
     /// request
     fn on_response(response: Response) -> Result<(), Error>;
