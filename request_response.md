@@ -183,38 +183,6 @@ pub enum ResponseMessage {
 }
 ```
 
-### Timeouts
-
-Both Post and Get requests have a timeout, a Post request timeout is evaluated based on the timestamp of the destination
-chain, this means that post requests cannot time out if the destination chain does not progress, using the destination
-chain timestamp instead of the source chain’s timestamp prevents situations where a bad actor could submit a timeout for
-a request that was already successfully executed on the destination. Timeout messages are accompanied by a proof of
-non-membership.
-
-Timeouts for Get requests are evaluated relative to the timestamp of the sending chain, the timestamp represents the
-time on the sending chain after which responses to a Get request will be rejected, no proofs are required.
-
-
-```rust
-/// A request message holds a batch of requests to be timed-out
-#[derive(Debug, Clone, Encode, Decode, scale_info::TypeInfo, PartialEq, Eq)]
-pub enum TimeoutMessage {
-    /// A non memership proof for POST requests
-    Post {
-        /// Request timeouts
-        requests: Vec<Request>,
-        /// Non membership batch proof for these requests
-        timeout_proof: Proof,
-    },
-    /// There are no proofs for Get timeouts, we only need to
-    /// ensure that the timeout timestamp has elapsed on the host
-    Get {
-        /// Requests that have timed out
-        requests: Vec<Request>,
-    },
-}
-```
-
 ### Response Structure
 
 There are two kind of responses in ISMP, the response to a Post request contains some opaque bytes that would be decoded
@@ -250,6 +218,38 @@ pub enum Response {
     Get(GetResponse),
 }
 
+```
+
+### Timeouts
+
+Both Post and Get requests have a timeout, a Post request timeout is evaluated based on the timestamp of the destination
+chain, this means that post requests cannot time out if the destination chain does not progress, using the destination
+chain timestamp instead of the source chain’s timestamp prevents situations where a bad actor could submit a timeout for
+a request that was already successfully executed on the destination. Timeout messages are accompanied by a proof of
+non-membership.
+
+Timeouts for Get requests are evaluated relative to the timestamp of the sending chain, the timestamp represents the
+time on the sending chain after which responses to a Get request will be rejected, no proofs are required.
+
+
+```rust
+/// A request message holds a batch of requests to be timed-out
+#[derive(Debug, Clone, Encode, Decode, scale_info::TypeInfo, PartialEq, Eq)]
+pub enum TimeoutMessage {
+    /// A non memership proof for POST requests
+    Post {
+        /// Request timeouts
+        requests: Vec<Request>,
+        /// Non membership batch proof for these requests
+        timeout_proof: Proof,
+    },
+    /// There are no proofs for Get timeouts, we only need to
+    /// ensure that the timeout timestamp has elapsed on the host
+    Get {
+        /// Requests that have timed out
+        requests: Vec<Request>,
+    },
+}
 ```
 
 ### How requests and responses flow in storage
