@@ -9,9 +9,9 @@ An ISMP request can either be POST or GET similar to what is obtainable in HTTP.
 ```rust
 pub struct Post {
     /// The source state machine of this request.
-    pub source_chain: StateMachine,
+    pub source: StateMachine,
     /// The destination state machine of this request.
-    pub dest_chain: StateMachine,
+    pub dest: StateMachine,
     /// The nonce of this request on the source chain
     pub nonce: u64,
     /// Module Id of the sending module
@@ -22,6 +22,10 @@ pub struct Post {
     pub timeout_timestamp: u64,
     /// Encoded Request.
     pub data: Vec<u8>,
+    /// Gas limit for executing the request on destination & it's response on the source.
+    /// should be max(destination_gas_limit, response_gas_limit)
+    /// This value should be zero if destination module is not a contract
+    pub gas_limit: u64,
 }
 
 /// The ISMP GET request.
@@ -40,6 +44,9 @@ pub struct Get {
     pub height: u64,
     /// Host timestamp at which this request expires in seconds
     pub timeout_timestamp: u64,
+    /// Gas limit for executing the response to this get request
+    /// This value should be zero if the sending module is not a contract
+    pub gas_limit: u64,
 }
 
 pub enum Request {
@@ -71,6 +78,39 @@ chain, after verifying this proof, a receipt for the request is committed to sto
 module or contract can create a response synchronously or asynchronously, whenever this response is available it would
 be relayed back to the source chain.
 
+```rust
+/// Identifies a state machine at a given height
+#[derive(
+    Debug, Clone, Copy, Encode, Decode, scale_info::TypeInfo, PartialEq, Eq, Hash, Ord, PartialOrd,
+)]
+pub struct StateMachineHeight {
+    /// The state machine identifier
+    pub id: StateMachineId,
+    /// the corresponding block height
+    pub height: u64,
+}
+
+
+/// Proof holds the relevant proof data for the context in which it's used.
+#[derive(Debug, Clone, Encode, Decode, scale_info::TypeInfo, PartialEq, Eq)]
+pub struct Proof {
+    /// State machine height
+    pub height: StateMachineHeight,
+    /// Scale encoded proof
+    pub proof: Vec<u8>,
+}
+
+/// A request message holds a batch of requests to be dispatched from a source state machine
+#[derive(Debug, Clone, Encode, Decode, scale_info::TypeInfo, PartialEq, Eq)]
+pub struct RequestMessage {
+    /// Requests from source chain
+    pub requests: Vec<Post>,
+    /// Membership batch proof for these requests
+    pub proof: Proof,
+}
+
+```
+
 ![](./assets/ismp_request.drawio.png)
 ![](./assets/get_request.drawio.png)
 
@@ -78,9 +118,70 @@ A response to a post request is created and dispatched by the `IsmpDispatch::dis
 commitment of that response which is a keccak256 hash of the response is inserted into the state trie, and a `Response`
 event is emitted, this event informs any party that wishes to relay the response to be aware of its existence.
 
+```rust
+
+/// The response to a POST request
+#[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, scale_info::TypeInfo)]
+pub struct PostResponse {
+    /// The request that triggered this response.
+    pub post: Post,
+    /// The response message.
+    pub response: Vec<u8>,
+}
+
+/// The response to a POST request
+#[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, scale_info::TypeInfo)]
+pub struct GetResponse {
+    /// The Get request that triggered this response.
+    pub get: Get,
+    /// Values derived from the state proof
+    pub values: BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+}
+
+/// The ISMP response
+#[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, scale_info::TypeInfo)]
+pub enum Response {
+    /// The response to a POST request
+    Post(PostResponse),
+    /// The response to a GET request
+    Get(GetResponse),
+}
+
+/// The ISMP response
+#[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, scale_info::TypeInfo)]
+pub enum Response {
+    /// The response to a POST request
+    Post(PostResponse),
+    /// The response to a GET request
+    Get(GetResponse),
+}
+
+```
+
 A `ResponseMessage` that contains the response alongside a proof of membership is then submitted to the counterparty
 chain, after verifying this proof, a receipt for the response is committed to storage, the receipt is used to prevent
 processing duplicate responses.
+
+```rust
+/// A request message holds a batch of responses to be dispatched from a source state machine
+#[derive(Debug, Clone, Encode, Decode, scale_info::TypeInfo, PartialEq, Eq)]
+pub enum ResponseMessage {
+    /// A POST request for sending data
+    Post {
+        /// Responses from sink chain
+        responses: Vec<Response>,
+        /// Membership batch proof for these responses
+        proof: Proof,
+    },
+    /// A GET request for querying data
+    Get {
+        /// Request batch
+        requests: Vec<Request>,
+        /// State proof
+        proof: Proof,
+    },
+}
+```
 
 ### Timeouts
 
@@ -92,6 +193,27 @@ non-membership.
 
 Timeouts for Get requests are evaluated relative to the timestamp of the sending chain, the timestamp represents the
 time on the sending chain after which responses to a Get request will be rejected, no proofs are required.
+
+
+```rust
+/// A request message holds a batch of requests to be timed-out
+#[derive(Debug, Clone, Encode, Decode, scale_info::TypeInfo, PartialEq, Eq)]
+pub enum TimeoutMessage {
+    /// A non memership proof for POST requests
+    Post {
+        /// Request timeouts
+        requests: Vec<Request>,
+        /// Non membership batch proof for these requests
+        timeout_proof: Proof,
+    },
+    /// There are no proofs for Get timeouts, we only need to
+    /// ensure that the timeout timestamp has elapsed on the host
+    Get {
+        /// Requests that have timed out
+        requests: Vec<Request>,
+    },
+}
+```
 
 ### Response Structure
 

@@ -37,17 +37,23 @@ pub type ConsensusClientId = [u8; 4];
 
 /// The message that offchain parties send to initialize a consensus client.
 pub struct CreateConsensusClientMessage {
-    /// encoded consensus state
+    /// Scale encoded consensus state
     pub consensus_state: Vec<u8>,
     /// Consensus client id
     pub consensus_client_id: ConsensusClientId,
+    /// The consensus state Id
+    pub consensus_state_id: ConsensusStateId,
+    /// Unbonding period for this consensus state.
+    pub unbonding_period: u64,
+    /// Challenge period for this consensus state
+    pub challenge_period: u64,
     /// State machine commitments
-    pub state_machine_commitments: Vec<(StateMachineId, StateMachineHeight)>,
+    pub state_machine_commitments: Vec<(StateMachineId, StateCommitmentHeight)>,
 }
 
 ```
 
-This should be a subjectively chosen initial state for a consensus client. A sort of trusted setup for the initiated. Because it is subjectively chosen, it is recommended that this message is initiated either by the "admin" of the state machine or through a quorum of votes which allows the network to properly audit the contents of the initial consensus state. The handler for this message simply persists the consensus client and all of it's intermediate states as is to storage. 
+This should be a subjectively chosen initial state for a consensus client. A sort of trusted setup for the initiated. Because it is subjectively chosen, it is recommended that this message is initiated either by the "admin" of the state machine or through a quorum of votes which allows the network to properly audit the contents of the initial consensus state. The handler for this message simply persists the consensus client and all of it's intermediate states as-is to storage. 
 
 
 ## `fn update_client(host: &dyn IsmpHost, message: ConsensusMessage)`
