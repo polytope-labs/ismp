@@ -2,6 +2,10 @@
 
 This repo hosts the specification for the Interoperable State Machine Protocol. 
 
+## Deprecation
+
+The ISMP specs are now hosted at [docs.hyperbridge.network](https://docs.hyperbridge.network/protocol/ismp/)
+
 
 ## License
 
